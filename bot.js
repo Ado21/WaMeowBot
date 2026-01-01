@@ -10,15 +10,15 @@ import { applyModeration } from "./biblioteca/moderation.js"
 import { getCommandPrefix } from "./biblioteca/settings.js"
 import { initSubbots } from "./subbotManager.js"
 import config from "./config.js"
-import { startWebPanel } from "./webpanel/app.js"
+import { startWebPanel } from './webpanel/app.js'
 
 if (!global.WEBPANEL_STARTED) {
-  global.WEBPANEL_STARTED = true
-  try {
-    startWebPanel()
-  } catch (e) {
-    console.error(chalk.red("「✦」Error iniciando panel web »"), e)
-  }
+global.WEBPANEL_STARTED = true
+try {
+startWebPanel()
+} catch (e) {
+console.error(chalk.red('「✦」Error iniciando panel web »'), e)
+}
 }
 
 const sessionFolder = "./session"
@@ -29,205 +29,163 @@ if (!fs.existsSync(sessionFolder)) fs.mkdirSync(sessionFolder, { recursive: true
 let usarCodigo = false
 let numero = ""
 
-// ✅ Por defecto: SOLO subbots (npm start normal)
-// Para habilitar el principal: RUN_MAIN=1 npm start
-let skipMain = process.env.RUN_MAIN !== "1"
-
 let subbotsReady = false
 let subbotsLock = null
 
 async function ensureSubbots() {
-  if (subbotsReady) return
-  if (subbotsLock) return subbotsLock
+if (subbotsReady) return
+if (subbotsLock) return subbotsLock
 
-  subbotsLock = (async () => {
-    try {
-      await initSubbots()
-      subbotsReady = true
-      console.log(chalk.green("「✿」Subbots reconectados"))
-    } catch (err) {
-      subbotsReady = false
-      console.error(chalk.red("「✦」Error al reconectar subbots »"), err)
-    } finally {
-      subbotsLock = null
-    }
-  })()
-
-  return subbotsLock
+subbotsLock = (async () => {
+try {
+await initSubbots()
+subbotsReady = true
+console.log(chalk.green("「✿」Subbots reconectados"))
+} catch (err) {
+subbotsReady = false
+console.error(chalk.red("「✦」Error al reconectar subbots »"), err)
+} finally {
+subbotsLock = null
 }
+})()
 
-function keepAlive() {
-  setInterval(() => {}, 1 << 30)
-}
-
-/**
- * “Principal virtual”: toma el primer subbot conectado y lo expone como MAIN_CONN/MAIN_JID
- * para que plugins/manager que esperan principal no se rompan.
- */
-function setVirtualMainFromSubbots() {
-  try {
-    if (!(global.conns instanceof Array)) global.conns = []
-
-    const first = global.conns.find((c) => {
-      const jid = c?.user?.jid || c?.user?.id
-      return Boolean(jid)
-    })
-
-    if (!first) {
-      console.log(chalk.yellow("「✦」No hay subbots disponibles para asignar principal virtual"))
-      return
-    }
-
-    const jid = first?.user?.jid || first?.user?.id || ""
-    if (jid) {
-      globalThis.MAIN_JID = jid
-      globalThis.MAIN_CONN = first
-      // opcional: “marcar” para lógica interna
-      first.isSubBot = false
-      first.isVirtualMain = true
-      console.log(chalk.greenBright(`「✿」Principal virtual asignado » ${String(jid).split("@")[0]}`))
-    }
-  } catch (e) {
-    console.error(chalk.red("「✦」Error asignando principal virtual »"), e)
-  }
+return subbotsLock
 }
 
 async function main() {
-  console.clear()
-  console.log(chalk.hex("#6A0DAD").bold("「✿」Meow WaBot"))
-  console.log(chalk.gray("☆ Hecho por Ado :D"))
+console.clear()
+console.log(chalk.hex('#6A0DAD').bold("「✿」Meow WaBot"))
+console.log(chalk.gray("☆ Hecho por Ado :D"))
 
-  // Mejora general de performance en Node (libuv threadpool)
-  // Nota: no afecta si ya fue seteado antes del proceso.
-  if (!process.env.UV_THREADPOOL_SIZE) process.env.UV_THREADPOOL_SIZE = "16"
+if (!fs.existsSync(credsPath)) {
+console.log(chalk.white("\n> 1 » Conectar con código QR"))
+console.log(chalk.white("> 2 » Conectar con código de 8 dígitos"))
 
-  if (skipMain) {
-    console.log(chalk.yellowBright("\n「✿」Modo subbots (default): principal omitido"))
-    console.log(chalk.gray("☆ Para habilitar principal: RUN_MAIN=1 npm start"))
+const opcion = readlineSync.question(chalk.yellow("\n☆ Elige una opción (1 o 2) » "))
+usarCodigo = opcion === "2"
 
-    await ensureSubbots().catch(() => {})
+if (usarCodigo) {
+numero = readlineSync.question(chalk.yellow("☆ Ingresa tu número (ej: 5218144380378) » "))
+}
 
-    // ✅ Simula principal “como si ya estuviera”
-    setVirtualMainFromSubbots()
+}
 
-    console.log(chalk.gray("☆ Subbots activos. Panel web y manager iniciados."))
-    keepAlive()
-    return
-  }
-
-  // Si habilitas principal con RUN_MAIN=1, corre el flujo normal
-  await iniciarBot()
+await iniciarBot()
 }
 
 async function iniciarBot() {
-  const { state, saveCreds } = await baileys.useMultiFileAuthState("session")
-  const { version } = await baileys.fetchLatestBaileysVersion()
+const { state, saveCreds } = await baileys.useMultiFileAuthState("session")
+const { version } = await baileys.fetchLatestBaileysVersion()
 
-  const sock = baileys.makeWASocket({
-    version,
-    printQRInTerminal: !usarCodigo && !fs.existsSync(credsPath),
-    logger: pino({ level: "silent" }),
-    auth: {
-      creds: state.creds,
-      keys: baileys.makeCacheableSignalKeyStore(state.keys, pino({ level: "silent" })),
-    },
-    browser: ["Ubuntu", "Chrome", "108.0.5359.125"],
-    syncFullHistory: false,
-    markOnlineOnConnect: false,
+const sock = baileys.makeWASocket({
+version,
+printQRInTerminal: !usarCodigo && !fs.existsSync(credsPath),
+logger: pino({ level: "silent" }),
+auth: {
+creds: state.creds,
+keys: baileys.makeCacheableSignalKeyStore(state.keys, pino({ level: "silent" }))
+},
+browser: ["Ubuntu", "Chrome", "108.0.5359.125"],
+syncFullHistory: false,
+markOnlineOnConnect: false
+})
 
-    // ⚡ Rendimiento en grupos grandes (BLY)
-    enableParallelMessageProcessing: true,
-    maxParallelMessageThreads: 8,
+sock.ev.on("creds.update", saveCreds)
+
+sock.isSubBot = false
+
+sock.ev.on("connection.update", async ({ connection, lastDisconnect }) => {
+const code = lastDisconnect?.error?.output?.statusCode
+
+if (connection === "open") {
+try {
+  const jid = sock?.user?.jid || sock?.user?.id || ''
+  if (jid) globalThis.MAIN_JID = jid
+  if (!(global.conns instanceof Array)) global.conns = []
+  const norm = (s) => String(s || '').split(':')[0]
+  const meNum = String(jid).split('@')[0]
+  global.conns = global.conns.filter((c) => {
+    const cj = c?.user?.jid || c?.user?.id || ''
+    const cn = String(cj).split('@')[0]
+    return cn && cn !== meNum
   })
+  global.conns.push(sock)
+} catch {}
 
-  sock.ev.on("creds.update", saveCreds)
-  sock.isSubBot = false
+console.log(chalk.greenBright("\n「✿」¡Conectado correctamente!"))
+console.log(chalk.gray("☆ Esperando mensajes..."))
+ensureSubbots().catch(() => {})
+}
 
-  sock.ev.on("connection.update", async ({ connection, lastDisconnect }) => {
-    const code = lastDisconnect?.error?.output?.statusCode
+if (connection === "close") {
+const reconectar = code !== baileys.DisconnectReason.loggedOut
+console.log(chalk.red("\n「✦」Conexión cerrada"))
+console.log(chalk.gray(`> Código » ${code}`))
 
-    if (connection === "open") {
-      try {
-        const jid = sock?.user?.jid || sock?.user?.id || ""
-        if (jid) globalThis.MAIN_JID = jid
-        if (!(global.conns instanceof Array)) global.conns = []
+if (reconectar) {
+console.log(chalk.yellow("☆ Reconectando..."))
+try {
+sock.ev.removeAllListeners()
+} catch {}
+setTimeout(() => iniciarBot().catch(() => {}), 1500)
+} else {
+console.log(
+chalk.redBright("☆ Sesión cerrada. Borra la carpeta 'session' y vuelve a vincular.")
+)
+}
+}
 
-        const meNum = String(jid).split("@")[0]
-        global.conns = global.conns.filter((c) => {
-          const cj = c?.user?.jid || c?.user?.id || ""
-          const cn = String(cj).split("@")[0]
-          return cn && cn !== meNum
-        })
-        global.conns.push(sock)
-      } catch {}
+})
 
-      console.log(chalk.greenBright("\n「✿」¡Conectado correctamente!"))
-      console.log(chalk.gray("☆ Esperando mensajes..."))
-      ensureSubbots().catch(() => {})
-    }
+groupWelcome(sock)
+groupAvisos(sock)
 
-    if (connection === "close") {
-      const reconectar = code !== baileys.DisconnectReason.loggedOut
-      console.log(chalk.red("\n「✦」Conexión cerrada"))
-      console.log(chalk.gray(`> Código » ${code}`))
+sock.ev.on("messages.upsert", async ({ messages, type }) => {
+if (type !== "notify") return
 
-      if (reconectar) {
-        console.log(chalk.yellow("☆ Reconectando..."))
-        try {
-          sock.ev.removeAllListeners()
-        } catch {}
-        setTimeout(() => iniciarBot().catch(() => {}), 1500)
-      } else {
-        console.log(chalk.redBright("☆ Sesión cerrada. Borra la carpeta 'session' y vuelve a vincular."))
-      }
-    }
-  })
+// Prefijo (main). Evita cálculos por mensaje.
+const usedPrefix = getCommandPrefix('') || globalThis?.prefijo || config?.prefijo || config?.PREFIX || '.'
 
-  groupWelcome(sock)
-  groupAvisos(sock)
+for (const msg of messages || []) {
+if (!msg?.message) continue
 
-  sock.ev.on("messages.upsert", async ({ messages, type }) => {
-    if (type !== "notify") return
+const from = msg.key?.remoteJid || ""
+const isGroup = from.endsWith("@g.us")
 
-    const usedPrefix = getCommandPrefix("") || globalThis?.prefijo || config?.prefijo || config?.PREFIX || "."
+const texto =
+msg.message?.conversation ||
+msg.message?.extendedTextMessage?.text ||
+msg.message?.imageMessage?.caption ||
+msg.message?.videoMessage?.caption ||
+""
 
-    for (const msg of messages || []) {
-      if (!msg?.message) continue
+// Si es comando, NO pasar por antilink (evita retardos y que borre el comando)
+const isCommand = String(texto || '').trim().startsWith(String(usedPrefix || '.'))
 
-      const texto =
-        msg.message?.conversation ||
-        msg.message?.extendedTextMessage?.text ||
-        msg.message?.imageMessage?.caption ||
-        msg.message?.videoMessage?.caption ||
-        msg.message?.documentMessage?.caption ||
-        ""
+if (!isCommand) {
+  // Moderación en background para no bloquear respuestas
+  applyModeration(sock, msg, texto).catch(() => {})
+}
 
-      const isCommand = String(texto || "").trim().startsWith(String(usedPrefix || "."))
+handleMessage(sock, msg).catch((e) => {
+  console.error(chalk.red("「✦」Error handleMessage »"), e)
+})
+}
 
-      // 🔥 No bloquees el listener: en grupos grandes esto evita colas de 10–15s.
-      if (!isCommand) {
-        void applyModeration(sock, msg, texto).catch(() => {})
-        continue
-      }
+})
 
-      void handleMessage(sock, msg).catch((e) => {
-        console.error(chalk.red("「✦」Error handleMessage »"), e)
-      })
-    }
-  })
-
-  if (usarCodigo && !state.creds.registered && !fs.existsSync(credsPath)) {
-    setTimeout(async () => {
-      try {
-        const code = await sock.requestPairingCode(String(numero || "").replace(/\D/g, ""))
-        console.log(chalk.hex("#A020F0").bold("\n「✿」Código de emparejamiento"))
-        console.log(chalk.white("> Código » ") + chalk.greenBright.bold(code))
-        console.log(chalk.gray("☆ WhatsApp » Dispositivos vinculados » Vincular » Usar código"))
-      } catch (e) {
-        console.log(chalk.red("「✦」Error al generar código »"), e)
-      }
-    }, 2500)
-  }
+if (usarCodigo && !state.creds.registered && !fs.existsSync(credsPath)) {
+setTimeout(async () => {
+try {
+const code = await sock.requestPairingCode(String(numero || "").replace(/\D/g, ""))
+console.log(chalk.hex('#A020F0').bold("\n「✿」Código de emparejamiento"))
+console.log(chalk.white(`> Código » `) + chalk.greenBright.bold(code))
+console.log(chalk.gray("☆ WhatsApp » Dispositivos vinculados » Vincular » Usar código"))
+} catch (e) {
+console.log(chalk.red("「✦」Error al generar código »"), e)
+}
+}, 2500)
+}
 }
 
 start()
